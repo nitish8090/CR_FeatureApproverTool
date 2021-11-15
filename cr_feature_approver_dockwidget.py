@@ -21,7 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-
+import datetime
 import os
 
 from qgis.PyQt import QtGui, QtWidgets, uic
@@ -51,21 +51,32 @@ class CRFeatureApproverDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # UI Conncetions
         # self.combobox_layers
-        self.cbox_roof_t.addItems(['Flat', 'Gable', 'Mix', 'Hip', 'Other'])
-        self.cbox_roof_c.addItems(['Good', 'Fair', 'Bad', 'Damaged'])
-        self.cbox_roof_m.addItems(['Asphalt', 'Tile', 'Shingle', 'Metal', 'Other'])
+        # self.cbox_roof_t.addItems(['Flat', 'Gable', 'Mix', 'Hip', 'Other'])
+        # self.cbox_roof_c.addItems(['Good', 'Fair', 'Bad', 'Damaged'])
+        # self.cbox_roof_m.addItems(['Asphalt', 'Tile', 'Shingle', 'Metal', 'Other'])
 
         # self.cbox_roof_t.currentTextChanged.connect(self.check_is_dirty)
         # self.cbox_roof_c.currentTextChanged.connect(self.check_is_dirty)
         # self.cbox_roof_m.currentTextChanged.connect(self.check_is_dirty)
 
         # Button Connections
-        self.btn_refresh_layer.clicked.connect(self.refresh_layer_list)
-        self.btn_select_layer.clicked.connect(self.select_layer)
+        self.btn_accept.clicked.connect(self.accept)
+        self.btn_corrected.clicked.connect(self.corrected)
+        self.btn_delete.clicked.connect(self.delete)
+        self.btn_skip.clicked.connect(self.skip)
 
-        self.btn_next.clicked.connect(self.next)
-        self.btn_previous.clicked.connect(self.previous)
-        self.btn_approve_next.clicked.connect(self.approve_and_next)
+        self.btn_refresh_layer.clicked.connect(self.refresh_layer_list)
+        self.btn_select_layer.clicked.connect(self.start_work)
+        self.btn_stop_work.clicked.connect(self.stop_work)
+
+        self.btn_zoom_to_current_feature.clicked.connect(self.zoom_to_current_feature)
+        self.btn_update_attribute.clicked.connect(self.update_attribute_btn_click)
+        self.cbox_attribute.addItems(['Good', 'Fair', 'Bad', 'Damaged'])
+        # self.lbl_current_attribute
+
+        # self.btn_next.clicked.connect(self.next)
+        # self.btn_previous.clicked.connect(self.previous)
+        # self.btn_approve_next.clicked.connect(self.approve_and_next)
 
     def closeEvent(self, event):
         self.closingPlugin.emit()
@@ -82,7 +93,7 @@ class CRFeatureApproverDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 self.combobox_layers.addItem(layer_name)
                 print(f"{layer_name} | Added to combo box")
 
-    def select_layer(self):
+    def start_work(self):
         """ Select the layer and start the work"""
         print("Selecting Layer")
 
@@ -100,118 +111,125 @@ class CRFeatureApproverDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.btn_select_layer.setEnabled(False)
         self.btn_refresh_layer.setEnabled(False)
         self.combobox_layers.setEnabled(False)
+        self.btn_stop_work.setEnabled(True) # Enable stop work button
+
+        # Enable Attribute Updator Buttons
+        self.cbox_attribute.setEnabled(True)
+        self.btn_update_attribute.setEnabled(True)
 
         # Enable approver buttons
-        self.btn_next.setEnabled(True)
-        # self.btn_previous.setEnabled(True)
-        self.btn_approve_next.setEnabled(True)
+        self.btn_accept.setEnabled(True)
+        self.btn_corrected.setEnabled(True)
+        self.btn_delete.setEnabled(True)
+        self.btn_skip.setEnabled(True)
 
+        # Enable zoom to current feature
+        self.btn_zoom_to_current_feature.setEnabled(True)
+
+        # Get and Zoom to first feature
         self.selected_feature = self.selected_layer.get_next_feature()
         zoom_to_a_feature(self.selected_feature)
 
-    def next(self):
-        self.skip_feature(self.selected_feature)
+    def stop_work(self):
+        self.selected_layer.layer.removeSelection()
 
-        self.selected_feature = self.selected_layer.get_next_feature()
-        zoom_to_a_feature(self.selected_feature)
-        self.update_combo_boxes(self.selected_feature)
+        self.selected_layer = None
+        self.selected_feature = None
 
-    def previous(self):
-        pass
+        self.btn_select_layer.setEnabled(True)
+        self.btn_refresh_layer.setEnabled(True)
+        self.combobox_layers.setEnabled(True)
 
-    def approve_and_next(self):
-        # new_value = 'True'
-        # with edit(self.selected_layer.layer):
-        #     print("Verifying feature")
-        #     self.selected_layer.layer.changeAttributeValue(self.selected_feature.id(),
-        #                                                    self.selected_layer.index_of_verified, new_value)
-        #
-        # self.selected_feature = self.selected_layer.get_next_feature()
-        # zoom_to_a_feature(self.selected_feature)
-        # self.update_combo_boxes(self.selected_feature)
+        # Enable Attribute Updator Buttons
+        self.cbox_attribute.setEnabled(False)
+        self.btn_update_attribute.setEnabled(False)
 
-        self.update_feature(self.selected_feature)
+        # Enable approver buttons
+        self.btn_accept.setEnabled(False)
+        self.btn_corrected.setEnabled(False)
+        self.btn_delete.setEnabled(False)
+        self.btn_skip.setEnabled(False)
+        self.btn_zoom_to_current_feature.setEnabled(False)
 
-        self.selected_feature = self.selected_layer.get_next_feature()
-        zoom_to_a_feature(self.selected_feature)
-        self.update_combo_boxes(self.selected_feature)
+        self.btn_stop_work.setEnabled(False)
 
-    def update_combo_boxes(self, feature):
-
-        # self.selected_layer.index_roof_t
-        # self.selected_layer.index_roof_c
-        # self.selected_layer.index_roof_m
-
-        roof_type = feature.attributes()[self.selected_layer.index_roof_t]
-        roof_condition = feature.attributes()[self.selected_layer.index_roof_c]
-        roof_material = feature.attributes()[self.selected_layer.index_roof_m]
-        print(roof_type, roof_condition, roof_material)
-
-        roof_type_index = self.cbox_roof_t.findText(roof_type, Qt.MatchContains)
-        self.cbox_roof_t.setCurrentIndex(roof_type_index)
-
-        roof_condition_index = self.cbox_roof_c.findText(roof_condition, Qt.MatchContains)
-        self.cbox_roof_c.setCurrentIndex(roof_condition_index)
-
-        roof_material_index = self.cbox_roof_m.findText(roof_material, Qt.MatchContains)
-        self.cbox_roof_m.setCurrentIndex(roof_material_index)
-        print(roof_type_index, roof_condition_index, roof_material_index)
-
-    def update_feature(self, feature):
-        roof_type = feature.attributes()[self.selected_layer.index_roof_t]
-        roof_condition = feature.attributes()[self.selected_layer.index_roof_c]
-        roof_material = feature.attributes()[self.selected_layer.index_roof_m]
-        #
-        # roof_type_index = self.cbox_roof_t.findText(roof_type, Qt.MatchContains)
-        # self.cbox_roof_t.setCurrentIndex(roof_type_index)
-
-        # roof_condition_index = self.cbox_roof_t.findText(roof_condition, Qt.MatchContains)
-        current_roof_type = self.cbox_roof_t.currentText()
-        current_roof_condition = self.cbox_roof_c.currentText()
-        current_roof_material = self.cbox_roof_m.currentText()
-
-        is_dirty = False
-
-        if roof_type != current_roof_type or roof_material != current_roof_material or roof_condition != current_roof_condition:
-            is_dirty = True
-            print('is dirty true')
-
-        if is_dirty:
+    def update_attribute_btn_click(self):
+        print("Updating Attribute")
+        if self.selected_layer.layer.isEditable():
+            print("\tLayer is already in edit mode")
+            self.selected_layer.layer.changeAttributeValue(self.selected_feature.id(),
+                                                           self.selected_layer.index_of_cc_roof_c,
+                                                           self.cbox_attribute.currentText())
+        else:
+            print("\tLayer is not in edit mode")
             with edit(self.selected_layer.layer):
-                print("Editing feature")
+                future_new_value = self.cbox_attribute.currentText()
+                print(f"\tChanging to: {future_new_value}")
+                self.selected_layer.layer.changeAttributeValue(self.selected_feature.id(),
+                                                               self.selected_layer.index_of_cc_roof_c,
+                                                               future_new_value)
+        self.lbl_current_attribute.setText(self.cbox_attribute.currentText())
 
-                self.selected_layer.layer.changeAttributeValue(feature.id(),
-                                                               self.selected_layer.index_roof_t, current_roof_type)
-                self.selected_layer.layer.changeAttributeValue(feature.id(),
-                                                               self.selected_layer.index_roof_c, current_roof_condition)
-                self.selected_layer.layer.changeAttributeValue(feature.id(),
-                                                               self.selected_layer.index_roof_m, current_roof_material)
+    def accept(self):
+        self.update_feature(self.selected_feature, status='Accepted')
+        self.selected_feature = self.selected_layer.get_next_feature()
+        zoom_to_a_feature(self.selected_feature)
 
-                self.selected_layer.layer.changeAttributeValue(feature.id(),
-                                                               self.selected_layer.index_of_cc_status, 'Corrected')
+        self.lbl_current_attribute.setText(
+            str(self.selected_feature.attributes()[self.selected_layer.index_of_cc_roof_c]))
 
-                # self.selected_layer.layer.changeAttributeValue(feature.id(),
-                #                                                self.selected_layer.index_of_modified, 'True')
+    def corrected(self):
+        self.update_feature(self.selected_feature, status='Corrected')
+        self.selected_feature = self.selected_layer.get_next_feature()
+        zoom_to_a_feature(self.selected_feature)
 
+        self.lbl_current_attribute.setText(
+            str(self.selected_feature.attributes()[self.selected_layer.index_of_cc_roof_c]))
+
+    def delete(self):
+        self.update_feature(self.selected_feature, status='Deleted')
+        self.selected_feature = self.selected_layer.get_next_feature()
+        zoom_to_a_feature(self.selected_feature)
+
+        self.lbl_current_attribute.setText(
+            str(self.selected_feature.attributes()[self.selected_layer.index_of_cc_roof_c]))
+
+    def skip(self):
+        self.update_feature(self.selected_feature, status='Skipped')
+        self.selected_feature = self.selected_layer.get_next_feature()
+        zoom_to_a_feature(self.selected_feature)
+
+        self.lbl_current_attribute.setText(
+            str(self.selected_feature.attributes()[self.selected_layer.index_of_cc_roof_c]))
+
+    def zoom_to_current_feature(self):
+        zoom_to_a_feature(self.selected_feature)
+        self.selected_layer.layer.removeSelection()
+        self.selected_layer.layer.select(self.selected_feature.id())
+
+    def update_feature(self, feature, status):
+        current_time = datetime.datetime.now()
+        if self.selected_layer.layer.isEditable():
+            # Fix for if the layer is is edit mode already
+            print("Editing feature")
+            self.selected_layer.layer.changeAttributeValue(feature.id(),
+                                                           self.selected_layer.index_of_cc_status, status)
+            self.selected_layer.layer.changeAttributeValue(feature.id(),
+                                                           self.selected_layer.index_of_cc_time, str(current_time))
         else:
             with edit(self.selected_layer.layer):
-                print("Verifying feature")
+                print("Editing feature")
                 self.selected_layer.layer.changeAttributeValue(feature.id(),
-                                                               self.selected_layer.index_of_cc_status, 'Verified')
-
-        print("test end")
-
-        # roof_material_index = self.cbox_roof_t.findText(roof_material, Qt.MatchContains)
-        # self.cbox_roof_m.setCurrentIndex(roof_material_index)
-
-    # def check_is_dirty(self):
-    #     print("Dirty True")
+                                                               self.selected_layer.index_of_cc_status, status)
+                self.selected_layer.layer.changeAttributeValue(feature.id(),
+                                                               self.selected_layer.index_of_cc_time, str(current_time))
 
     def skip_feature(self, feature):
         with edit(self.selected_layer.layer):
             print("Verifying feature")
             self.selected_layer.layer.changeAttributeValue(feature.id(),
                                                            self.selected_layer.index_of_cc_status, 'Skipped')
+
 
 
 class SelectedLayer:
@@ -221,13 +239,15 @@ class SelectedLayer:
 
         self._field_names = None
 
-        self.features = self.layer.getFeatures(""" "cc_status" IS NULL """)
+        self.features = self.layer.getFeatures(""" "cc_status" IS NULL or "cc_status" = 'Skipped' """)
 
         # self.index_of_verified = None
         # self.index_of_modified = None
         # self.index_of_modifiedby = None
         # self.index_of_skipped = None
         self.index_of_cc_status = None
+        self.index_of_cc_time = None
+        self.index_of_cc_roof_c = None
 
         self.index_roof_t = None
         self.index_roof_c = None
@@ -245,7 +265,7 @@ class SelectedLayer:
 
         # Add validation fields if not present
         # valid_fields = ['verified', 'modified', 'modifiedby', 'skipped']
-        valid_fields = ['cc_status']
+        valid_fields = ['cc_status', 'cc_time', 'cc_roof_c']
         for valid_field in valid_fields:
             if valid_field not in self.field_names:
                 print(f"{valid_field} not found in {self.field_names} | Adding")
@@ -255,11 +275,13 @@ class SelectedLayer:
         self.layer.updateFields()
 
     def read_indexes(self):
-        self.index_roof_t = self.layer.fields().indexOf('Roof_T')
-        self.index_roof_c = self.layer.fields().indexOf('Roof_C')
-        self.index_roof_m = self.layer.fields().indexOf('Roof_M')
+        # self.index_roof_t = self.layer.fields().indexOf('Roof_T')
+        # self.index_roof_c = self.layer.fields().indexOf('Roof_C')
+        # self.index_roof_m = self.layer.fields().indexOf('Roof_M')
 
         self.index_of_cc_status = self.layer.fields().indexOf('cc_status')
+        self.index_of_cc_time = self.layer.fields().indexOf('cc_time')
+        self.index_of_cc_roof_c = self.layer.fields().indexOf('cc_roof_c')
 
         # self.index_of_verified = self.layer.fields().indexOf('verified')
         # self.index_of_modified = self.layer.fields().indexOf('modified')
@@ -268,6 +290,10 @@ class SelectedLayer:
 
     def get_next_feature(self):
         feature = next(self.features)
+        print(f"Selecting feature: {feature.id()}")
+        self.layer.removeSelection()
+        self.layer.select(feature.id())
+        self.layer.triggerRepaint()
         return feature
 
     def enable_labels(self):
@@ -285,8 +311,8 @@ class SelectedLayer:
         # text_format.setBuffer(buffer_settings)
         # layer_settings.setFormat(text_format)
 
-        layer_settings.fieldName = """ concat("Roof_T" , ', ' , "Roof_C",  ', ', "Roof_M") """
-        layer_settings.isExpression = True
+        layer_settings.fieldName = "cc_status"
+        # layer_settings.isExpression = True
         # layer_settings.placement = 2
 
         layer_settings.enabled = True

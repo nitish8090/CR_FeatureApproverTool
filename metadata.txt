@@ -3,10 +3,10 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=CR Feature Approver
+name=CR Feature Approver V2.1
 qgisMinimumVersion=3.0
-description=CR Featur eApprover
-version=0.1
+description=CR Feature Approver V2.1
+version=2.1
 author=Nitish Patel @ CodeRize Technologies
 email=demo@email.com
 

@@ -65,7 +65,7 @@ class CRFeatureApprover:
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&CR Feature Approver')
+        self.menu = self.tr(u'&CR Feature Approver V2')
 
         self.toolbar = self.iface.addToolBar(u'sdaf')
         self.toolbar.setObjectName(u'sdaf')
